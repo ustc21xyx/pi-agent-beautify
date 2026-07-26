@@ -1,6 +1,6 @@
 {
   "name": "pi-agent-beautify",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Terminal visual polish for pi coding agent: natural multi-level headings, tool-panel code blocks, clipboard image chips",
   "type": "module",
   "files": [
