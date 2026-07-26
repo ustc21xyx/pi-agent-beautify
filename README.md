@@ -25,6 +25,10 @@ This extension:
 
 Clipboard `pi-clipboard-*` paths render as compact `[image1]` chips in the editor, then expand back to real paths before submit.
 
+### 4. User message accent bar
+
+User prompts get a soft blue left stripe (`▎`, theme `borderAccent` / blue) so they read clearly against assistant output — similar to modern chat UIs.
+
 ## Install
 
 ### npm (recommended)
@@ -32,7 +36,7 @@ Clipboard `pi-clipboard-*` paths render as compact `[image1]` chips in the edito
 ```bash
 pi install npm:pi-agent-beautify
 # pin a version
-pi install npm:pi-agent-beautify@0.1.1
+pi install npm:pi-agent-beautify@0.1.2
 ```
 
 ### GitHub

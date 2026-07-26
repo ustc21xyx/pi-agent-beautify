@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 
-import { CustomEditor, type AppKeybinding, type ExtensionAPI, type KeybindingsManager, type Theme } from "@earendil-works/pi-coding-agent";
+import { CustomEditor, UserMessageComponent, type AppKeybinding, type ExtensionAPI, type KeybindingsManager, type Theme } from "@earendil-works/pi-coding-agent";
 import { getKeybindings, Markdown, matchesKey, truncateToWidth, visibleWidth, type AutocompleteProvider, type EditorComponent, type EditorTheme, type TUI } from "@earendil-works/pi-tui";
 
 interface Attachment {
@@ -13,7 +13,13 @@ const TOKEN_RE = /\[image(\d+)\]/g;
 const TOKEN_LINE_RE = /\[image\d+\]/g;
 const IMAGE_FILE_RE = /\.(?:png|jpe?g|webp|gif)$/i;
 const MARKDOWN_PATCH_STATE = Symbol.for("pi-agent-beautify.markdown.patch");
+const USER_MESSAGE_PATCH_STATE = Symbol.for("pi-agent-beautify.user-message.patch");
 const PLAIN_CODE_LANGS = new Set(["text", "plain", "plaintext"]);
+/** Left accent bar for user messages (1 terminal column). */
+const USER_MESSAGE_BAR = "▎";
+const OSC133_ZONE_START = "\x1b]133;A\x07";
+const OSC133_ZONE_END = "\x1b]133;B\x07";
+const OSC133_ZONE_FINAL = "\x1b]133;C\x07";
 const MACOS_CLIPBOARD_FILE_PATHS_SCRIPT = `
 ObjC.import('AppKit');
 ObjC.import('Foundation');
@@ -290,6 +296,80 @@ function installMarkdownBeautifyPatch(): void {
     if (current && isMarkdownHeadingToken(token)) return current.renderHeadingToken(this, token, width, nextTokenType);
     if (current && isMarkdownCodeToken(token)) return current.renderCodeToken(this, token, width, nextTokenType);
     return (current?.original ?? original).call(this, token, width, nextTokenType, styleContext);
+  };
+}
+
+type UserMessageRender = (this: unknown, width: number) => string[];
+
+interface UserMessagePatchState {
+  installed: true;
+  original: UserMessageRender;
+  /** Style the left accent bar (defaults to a soft blue). */
+  barStyle?: (text: string) => string;
+}
+
+type PatchedUserMessagePrototype = {
+  render?: UserMessageRender;
+  [key: symbol]: unknown;
+};
+
+/**
+ * Strip OSC 133 shell-integration markers so we can re-wrap lines cleanly.
+ * UserMessageComponent injects these around the first/last rendered lines.
+ */
+function stripOsc133(line: string): string {
+  return line
+    .replaceAll(OSC133_ZONE_START, "")
+    .replaceAll(OSC133_ZONE_END, "")
+    .replaceAll(OSC133_ZONE_FINAL, "");
+}
+
+/**
+ * Paint a light-blue left bar on every user-message line.
+ * Mirrors the accent stripe in modern chat UIs (screenshot style).
+ *
+ * Caller should render the original component at `width - barWidth` so layout
+ * already accounts for the column we prepend — no right-edge clipping.
+ */
+function withUserMessageBar(lines: string[], barStyle?: (text: string) => string): string[] {
+  if (lines.length === 0) return lines;
+
+  const paintBar = barStyle ?? ((text: string) => text);
+  const bar = paintBar(USER_MESSAGE_BAR);
+
+  const painted = lines.map((raw) => {
+    // Strip OSC markers first; re-wrap after prepending the bar.
+    const body = stripOsc133(raw);
+    return `${bar}${body}`;
+  });
+
+  // Re-apply OSC 133 markers so shell integration / terminal zones stay intact.
+  painted[0] = OSC133_ZONE_START + painted[0];
+  painted[painted.length - 1] = OSC133_ZONE_END + OSC133_ZONE_FINAL + painted[painted.length - 1];
+  return painted;
+}
+
+function installUserMessageBarPatch(): void {
+  const proto = UserMessageComponent.prototype as unknown as PatchedUserMessagePrototype;
+  const existing = proto[USER_MESSAGE_PATCH_STATE] as UserMessagePatchState | undefined;
+  if (existing?.installed) return;
+
+  const original = proto.render;
+  if (typeof original !== "function") return;
+
+  const state: UserMessagePatchState = {
+    installed: true,
+    original,
+  };
+  proto[USER_MESSAGE_PATCH_STATE] = state;
+
+  proto.render = function (this: unknown, width: number): string[] {
+    const current = proto[USER_MESSAGE_PATCH_STATE] as UserMessagePatchState | undefined;
+    const barWidth = visibleWidth(USER_MESSAGE_BAR);
+    // Lay out content one column narrower so the bar never overflows.
+    const contentWidth = Math.max(1, width - barWidth);
+    const lines = (current?.original ?? original).call(this, contentWidth);
+    return withUserMessageBar(lines, current?.barStyle);
   };
 }
 
@@ -664,16 +744,30 @@ function collectImageAttachments(text: string, attachments: Map<string, Attachme
 
 export default function piAgentBeautify(pi: ExtensionAPI) {
   installMarkdownBeautifyPatch();
+  installUserMessageBarPatch();
 
   const attachments = new Map<string, Attachment>();
 
   pi.on("session_start", (_event, ctx) => {
     if (!ctx.hasUI) return;
     // Match tool-execution panel background so code blocks read as panels, not bare text.
-    const proto = Markdown.prototype as unknown as PatchedMarkdownPrototype;
-    const state = proto[MARKDOWN_PATCH_STATE] as MarkdownPatchState | undefined;
-    if (state) {
-      state.codeBlockBg = (text: string) => ctx.ui.theme.bg("toolPendingBg", text);
+    const mdProto = Markdown.prototype as unknown as PatchedMarkdownPrototype;
+    const mdState = mdProto[MARKDOWN_PATCH_STATE] as MarkdownPatchState | undefined;
+    if (mdState) {
+      mdState.codeBlockBg = (text: string) => ctx.ui.theme.bg("toolPendingBg", text);
+    }
+    // Soft blue accent bar on user messages.
+    // Prefer borderAccent (theme blue); fall back to border if unavailable.
+    const umProto = UserMessageComponent.prototype as unknown as PatchedUserMessagePrototype;
+    const umState = umProto[USER_MESSAGE_PATCH_STATE] as UserMessagePatchState | undefined;
+    if (umState) {
+      umState.barStyle = (text: string) => {
+        try {
+          return ctx.ui.theme.fg("borderAccent", text);
+        } catch {
+          return ctx.ui.theme.fg("border", text);
+        }
+      };
     }
     attachments.clear();
     const previousEditorFactory = ctx.ui.getEditorComponent();
