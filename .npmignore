@@ -1,0 +1,13 @@
+.netcatty-paste-images/
+*.tgz
+.git/
+.gitignore
+node_modules/
+*.log
+.DS_Store
+.idea/
+.vscode/
+dist/
+coverage/
+.env
+.env.*

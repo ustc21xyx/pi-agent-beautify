@@ -1,0 +1,11 @@
+node_modules/
+*.tgz
+.netcatty-paste-images/
+*.log
+.DS_Store
+.idea/
+.vscode/
+dist/
+coverage/
+.env
+.env.*
