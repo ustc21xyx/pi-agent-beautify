@@ -36,7 +36,7 @@ User prompts get a soft blue left stripe (`▎`, theme `borderAccent` / blue) so
 ```bash
 pi install npm:pi-agent-beautify
 # pin a version
-pi install npm:pi-agent-beautify@0.1.2
+pi install npm:pi-agent-beautify@0.1.3
 ```
 
 ### GitHub

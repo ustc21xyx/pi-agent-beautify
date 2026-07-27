@@ -20,6 +20,42 @@ const USER_MESSAGE_BAR = "▎";
 const OSC133_ZONE_START = "\x1b]133;A\x07";
 const OSC133_ZONE_END = "\x1b]133;B\x07";
 const OSC133_ZONE_FINAL = "\x1b]133;C\x07";
+/** Same keys pi uses so theme stays valid across /new /reload /session switch. */
+const PI_THEME_KEY = Symbol.for("@earendil-works/pi-coding-agent:theme");
+const PI_THEME_KEY_OLD = Symbol.for("@mariozechner/pi-coding-agent:theme");
+
+/**
+ * Read the live Theme from globalThis — never close over extension ctx.
+ * Session replacement invalidates ctx.ui, but the active Theme is always here.
+ */
+function getActiveTheme(): Theme | undefined {
+  const g = globalThis as typeof globalThis & Record<symbol, Theme | undefined>;
+  return g[PI_THEME_KEY] ?? g[PI_THEME_KEY_OLD];
+}
+
+function paintUserMessageBar(text: string): string {
+  const active = getActiveTheme();
+  if (!active) return text;
+  try {
+    return active.fg("borderAccent", text);
+  } catch {
+    try {
+      return active.fg("border", text);
+    } catch {
+      return text;
+    }
+  }
+}
+
+function paintToolPanelBg(text: string): string {
+  const active = getActiveTheme();
+  if (!active) return text;
+  try {
+    return active.bg("toolPendingBg", text);
+  } catch {
+    return text;
+  }
+}
 const MACOS_CLIPBOARD_FILE_PATHS_SCRIPT = `
 ObjC.import('AppKit');
 ObjC.import('Foundation');
@@ -304,8 +340,6 @@ type UserMessageRender = (this: unknown, width: number) => string[];
 interface UserMessagePatchState {
   installed: true;
   original: UserMessageRender;
-  /** Style the left accent bar (defaults to a soft blue). */
-  barStyle?: (text: string) => string;
 }
 
 type PatchedUserMessagePrototype = {
@@ -331,11 +365,12 @@ function stripOsc133(line: string): string {
  * Caller should render the original component at `width - barWidth` so layout
  * already accounts for the column we prepend — no right-edge clipping.
  */
-function withUserMessageBar(lines: string[], barStyle?: (text: string) => string): string[] {
+function withUserMessageBar(lines: string[]): string[] {
   if (lines.length === 0) return lines;
 
-  const paintBar = barStyle ?? ((text: string) => text);
-  const bar = paintBar(USER_MESSAGE_BAR);
+  // Resolve bar color from the live global theme on every paint — never from a
+  // captured extension ctx (those go stale after /new, /reload, session switch).
+  const bar = paintUserMessageBar(USER_MESSAGE_BAR);
 
   const painted = lines.map((raw) => {
     // Strip OSC markers first; re-wrap after prepending the bar.
@@ -369,7 +404,7 @@ function installUserMessageBarPatch(): void {
     // Lay out content one column narrower so the bar never overflows.
     const contentWidth = Math.max(1, width - barWidth);
     const lines = (current?.original ?? original).call(this, contentWidth);
-    return withUserMessageBar(lines, current?.barStyle);
+    return withUserMessageBar(lines);
   };
 }
 
@@ -751,39 +786,35 @@ export default function piAgentBeautify(pi: ExtensionAPI) {
   pi.on("session_start", (_event, ctx) => {
     if (!ctx.hasUI) return;
     // Match tool-execution panel background so code blocks read as panels, not bare text.
+    // Use global theme lookup — do NOT close over ctx (stale after /new|/reload).
     const mdProto = Markdown.prototype as unknown as PatchedMarkdownPrototype;
     const mdState = mdProto[MARKDOWN_PATCH_STATE] as MarkdownPatchState | undefined;
     if (mdState) {
-      mdState.codeBlockBg = (text: string) => ctx.ui.theme.bg("toolPendingBg", text);
-    }
-    // Soft blue accent bar on user messages.
-    // Prefer borderAccent (theme blue); fall back to border if unavailable.
-    const umProto = UserMessageComponent.prototype as unknown as PatchedUserMessagePrototype;
-    const umState = umProto[USER_MESSAGE_PATCH_STATE] as UserMessagePatchState | undefined;
-    if (umState) {
-      umState.barStyle = (text: string) => {
-        try {
-          return ctx.ui.theme.fg("borderAccent", text);
-        } catch {
-          return ctx.ui.theme.fg("border", text);
-        }
-      };
+      mdState.codeBlockBg = paintToolPanelBg;
     }
     attachments.clear();
     const previousEditorFactory = ctx.ui.getEditorComponent();
     const imageTokens = new ImageTokenController(attachments);
+    // Capture theme only for the status string painted right now (not for later renders).
+    const sessionTheme = ctx.ui.theme;
     ctx.ui.setEditorComponent((tui, theme, keybindings) => {
+      // getTheme reads the live global theme so chips stay valid after session replace.
       if (!previousEditorFactory) {
-        return new BeautifyEditor(tui, theme, keybindings, imageTokens, () => ctx.ui.theme);
+        return new BeautifyEditor(tui, theme, keybindings, imageTokens, () => getActiveTheme() ?? sessionTheme);
       }
-      return new BeautifyEditorWrapper(previousEditorFactory(tui, theme, keybindings), tui, keybindings, imageTokens, () => ctx.ui.theme);
+      return new BeautifyEditorWrapper(previousEditorFactory(tui, theme, keybindings), tui, keybindings, imageTokens, () => getActiveTheme() ?? sessionTheme);
     });
-    ctx.ui.setStatus("pi-agent-beautify", ctx.ui.theme.fg("dim", "beautify"));
+    ctx.ui.setStatus("pi-agent-beautify", sessionTheme.fg("dim", "beautify"));
   });
 
   pi.on("session_shutdown", (_event, ctx) => {
     attachments.clear();
-    if (ctx.hasUI) ctx.ui.setStatus("pi-agent-beautify", undefined);
+    // ctx may already be invalidated during session replace — never crash here.
+    try {
+      if (ctx.hasUI) ctx.ui.setStatus("pi-agent-beautify", undefined);
+    } catch {
+      // ignore stale ctx
+    }
   });
 
   pi.on("input", async (event) => {
