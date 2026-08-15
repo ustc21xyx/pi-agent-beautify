@@ -42,10 +42,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/baipiaoking88/pi-agent-beautify.git"
+    "url": "git+https://github.com/ustc21xyx/pi-agent-beautify.git"
   },
   "bugs": {
-    "url": "https://github.com/baipiaoking88/pi-agent-beautify/issues"
+    "url": "https://github.com/ustc21xyx/pi-agent-beautify/issues"
   },
-  "homepage": "https://github.com/baipiaoking88/pi-agent-beautify#readme"
+  "homepage": "https://github.com/ustc21xyx/pi-agent-beautify#readme"
 }

@@ -42,9 +42,9 @@ pi install npm:pi-agent-beautify@0.1.3
 ### GitHub
 
 ```bash
-pi install git:github.com/baipiaoking88/pi-agent-beautify
+pi install git:github.com/ustc21xyx/pi-agent-beautify
 # or
-pi install https://github.com/baipiaoking88/pi-agent-beautify
+pi install https://github.com/ustc21xyx/pi-agent-beautify
 ```
 
 ### Local path (development)
