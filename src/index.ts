@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 
 import { CustomEditor, UserMessageComponent, type AppKeybinding, type ExtensionAPI, type KeybindingsManager, type Theme } from "@earendil-works/pi-coding-agent";
 import { getKeybindings, Markdown, matchesKey, truncateToWidth, visibleWidth, type AutocompleteProvider, type EditorComponent, type EditorTheme, type TUI } from "@earendil-works/pi-tui";
+import { registerCjkMarkdownTransformer } from "./cjk-markdown.js";
 
 interface Attachment {
   token: string;
@@ -780,6 +781,7 @@ function collectImageAttachments(text: string, attachments: Map<string, Attachme
 export default function piAgentBeautify(pi: ExtensionAPI) {
   installMarkdownBeautifyPatch();
   installUserMessageBarPatch();
+  registerCjkMarkdownTransformer(pi);
 
   const attachments = new Map<string, Attachment>();
 

@@ -29,14 +29,23 @@ Clipboard `pi-clipboard-*` paths render as compact `[image1]` chips in the edito
 
 User prompts get a soft blue left stripe (`▎`, theme `borderAccent` / blue) so they read clearly against assistant output — similar to modern chat UIs.
 
+### 5. CJK Markdown emphasis & bold fix
+
+Under the CommonMark specification, bold/italic delimiters (`**`, `*`, `~~`) fail to close when preceded by CJK/ASCII punctuation (like `）` or `)`) and directly followed by CJK characters without whitespace (e.g. `**概念（Concept）**是`).
+
+This extension automatically hooks into Pi's `pi.registerMarkdownTransformer()` to repair these delimiter boundaries display-side:
+- Fixes bold, italic, and strikethrough next to CJK punctuation/brackets.
+- Fully display-only: never modifies the underlying LLM prompt context or session history.
+- Automatically protects code blocks (```...```), inline code (`...`), and LaTeX math expressions.
+
 ## Install
 
 ### npm (recommended)
 
 ```bash
-pi install npm:pi-agent-beautify
+pi install npm:@crushro/pi-agent-beautify
 # pin a version
-pi install npm:pi-agent-beautify@0.1.3
+pi install npm:@crushro/pi-agent-beautify@0.2.0
 ```
 
 ### GitHub
@@ -57,7 +66,7 @@ pi install ./pi-agent-beautify
 Try without writing settings:
 
 ```bash
-pi -e npm:pi-agent-beautify
+pi -e npm:@crushro/pi-agent-beautify
 pi -e /path/to/pi-agent-beautify
 ```
 
