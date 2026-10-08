@@ -558,6 +558,8 @@ class ImageTokenController {
 }
 
 class BeautifyEditor extends CustomEditor {
+  // Keep compatibility with Pi versions predating the constructor's embedding option.
+  readonly embedWorkingStatus = true;
   private scanTimers: Array<ReturnType<typeof setTimeout>> = [];
 
   constructor(
@@ -601,6 +603,11 @@ class BeautifyEditor extends CustomEditor {
   }
 }
 
+type WorkingStatusEditor = EditorComponent & {
+  readonly embedWorkingStatus?: boolean;
+  setWorkingStatusIndicator?: (indicator: unknown) => void;
+};
+
 class BeautifyEditorWrapper implements EditorComponent {
   actionHandlers = new Map<AppKeybinding, () => void>();
   private scanTimers: Array<ReturnType<typeof setTimeout>> = [];
@@ -618,6 +625,15 @@ class BeautifyEditorWrapper implements EditorComponent {
     private readonly imageTokens: ImageTokenController,
     private readonly getTheme: () => Theme,
   ) {}
+
+  get embedWorkingStatus(): boolean {
+    const inner = this.inner as WorkingStatusEditor;
+    return inner.embedWorkingStatus === true && typeof inner.setWorkingStatusIndicator === "function";
+  }
+
+  setWorkingStatusIndicator(indicator: unknown): void {
+    (this.inner as WorkingStatusEditor).setWorkingStatusIndicator?.(indicator);
+  }
 
   get focused(): boolean {
     return Boolean((this.inner as EditorComponent & { focused?: boolean }).focused);

@@ -33,6 +33,7 @@
     "typescript": "^6.0.3"
   },
   "scripts": {
+    "test": "node --test",
     "typecheck": "tsc --noEmit",
     "pack": "npm pack",
     "prepublishOnly": "npm pack --dry-run"
