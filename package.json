@@ -1,6 +1,6 @@
 {
   "name": "@crushro/pi-agent-beautify",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Terminal visual polish for pi coding agent: natural multi-level headings, tool-panel code blocks, user message accent bar, clipboard image chips, and CJK Markdown bold/emphasis auto-formatting",
   "type": "module",
   "files": [

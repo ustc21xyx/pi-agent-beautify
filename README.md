@@ -45,7 +45,7 @@ This extension automatically hooks into Pi's `pi.registerMarkdownTransformer()` 
 ```bash
 pi install npm:@crushro/pi-agent-beautify
 # pin a version
-pi install npm:@crushro/pi-agent-beautify@0.2.0
+pi install npm:@crushro/pi-agent-beautify@0.2.1
 ```
 
 ### GitHub

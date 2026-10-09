@@ -57,10 +57,12 @@ test("default beautify editor opts into embedded working status", async () => {
   const { editor } = await createEditor();
   assert.equal(editor.embedWorkingStatus, true);
   if (hasNativeIndicator) {
-    editor.setWorkingStatusIndicator(indicator);
-    assert.match(editor.render(80).join("\n"), /Connecting\.\.\./);
-    editor.setWorkingStatusIndicator(undefined);
-    assert.doesNotMatch(editor.render(80).join("\n"), /Connecting\.\.\./);
+    for (const label of ["Connecting...", "Thinking..."]) {
+      editor.setWorkingStatusIndicator({ ...indicator, renderInBorder() { return label; } });
+      assert.ok(editor.render(80)[0].includes(label), `${label} appears in the top border`);
+      editor.setWorkingStatusIndicator(undefined);
+      assert.ok(!editor.render(80).join("\n").includes(label), `${label} is cleared`);
+    }
   }
 });
 
